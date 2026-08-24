@@ -1,0 +1,37 @@
+export const rooms = [
+  {
+    databaseId:1,
+    slug: 'view-double',
+    name: '景觀雙人房',
+    price: 2400,
+    people: '2 人入住',
+    description: '明亮舒適的雙人空間，享受窗外景色與安靜的旅行時光。',
+    images: [
+      '/images/rooms/view-double.jpg',
+      '/images/rooms/view-double2.jpg',
+      '/images/rooms/view-double3.jpg',
+      '/images/rooms/view-double4.jpg',
+      '/images/rooms/view-double5.jpg',
+      '/images/rooms/view-double6.jpg',
+    ],
+    facilities: ['兩張單人床', '獨立衛浴', '冷暖空調', '免費 Wi‑Fi', '盥洗用品', '景觀窗'],
+  },
+  {
+    databaseId:4,
+    slug: 'warm-quad',
+    name: '溫馨四人房',
+    price: 4800,
+    people: '4 人入住',
+    description: '適合家人與好友同行的寬敞房型，留下最自在的旅行回憶。',
+    images: [
+      '/images/rooms/family-quad.jpg',
+      '/images/rooms/family-quad2.jpg',
+      '/images/rooms/family-quad3.jpg',
+      '/images/rooms/family-quad4.jpg',
+      '/images/rooms/family-quad5.jpg',
+      '/images/rooms/family-quad6.jpg',
+      '/images/rooms/family-quad7.jpg',
+    ],
+    facilities: ['兩張雙人床', '獨立衛浴', '冷暖空調', '免費 Wi‑Fi', '盥洗用品', '小客廳'],
+  },
+]

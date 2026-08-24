@@ -24,3 +24,67 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* ==========================================
+   react-datepicker 黑金深色旅宿風格 (大格子版)
+   ========================================== */
+.react-datepicker {
+  background-color: #1c1917 !important; /* stone-900 */
+  border: 1px solid rgba(217, 119, 6, 0.3) !important;
+  border-radius: 1rem !important;
+  color: #f5f5f4 !important;
+  font-family: inherit !important;
+  padding: 0.5rem !important;
+}
+
+.react-datepicker__header {
+  background-color: #0c0a09 !important; /* stone-950 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding-top: 1rem !important;
+}
+
+.react-datepicker__current-month {
+  color: #d97706 !important; /* amber-600 */
+  font-size: 1.2rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* 放大星期標題 */
+.react-datepicker__day-name {
+  color: #a8a29e !important;
+  width: 3.5rem !important; 
+  font-weight: bold !important;
+}
+
+/* 關鍵：放大日期格子，改變排版方向，讓金額與房數可以垂直漂亮顯示 */
+.react-datepicker__day {
+  color: #f5f5f4 !important;
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+  line-height: normal !important; /* 蓋掉預設的行高 */
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 0.5rem !important;
+  margin: 0.2rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: rgba(217, 119, 6, 0.2) !important;
+}
+
+/* 選取與區間狀態 */
+.react-datepicker__day--selected,
+.react-datepicker__day--in-selecting-range,
+.react-datepicker__day--in-range {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+
+/* 滿房或過去日期狀態 */
+.react-datepicker__day--disabled {
+  background-color: #292524 !important; /* stone-800 */
+  color: #57534e !important; /* stone-500 */
+  opacity: 0.7 !important;
+}
