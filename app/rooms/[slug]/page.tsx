@@ -21,6 +21,15 @@ export default async function RoomDetailPage({
            A路小琉球民宿 ⧗ A·road B&B
         </Link>
 
+<<<<<<< HEAD
+=======
+        <Link
+          href="/booking"
+          className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-bold text-stone-950"
+        >
+          立即訂房
+        </Link>
+>>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
       </nav>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
@@ -59,7 +68,17 @@ export default async function RoomDetailPage({
             <p className="mt-2 text-3xl font-bold text-amber-400">
               NT$ {room.price.toLocaleString()}
             </p>
+<<<<<<< HEAD
 
+=======
+              
+            <Link
+              href="/booking"
+              className="mt-6 block rounded-lg bg-amber-500 px-5 py-3 text-center font-bold text-stone-950 hover:bg-amber-400"
+            >
+              選擇此房型並訂房
+            </Link>
+>>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
           </aside>
         </div>
       </section>
