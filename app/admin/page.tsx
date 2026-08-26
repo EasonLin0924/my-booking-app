@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-<<<<<<< HEAD
 type Room = {
   id: number
   name: string
@@ -38,7 +37,6 @@ type Booking = {
   rooms?: { name: string }
 }
 
-// 可供加購的項目對照表 (供編輯時計算單價)
 const ADDON_PRICES: Record<string, { name: string; price: number }> = {
   bbq: { name: '🔥 BBQ', price: 400 },
   scuba: { name: '🤿 體驗潛水', price: 2500 },
@@ -57,13 +55,55 @@ const ADDON_PRICES: Record<string, { name: string; price: number }> = {
 export default function AdminPage() {
   const supabase = createClient()
 
+  // 1. 登入驗證 State
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [authenticating, setAuthenticating] = useState(false)
+
+  // 2. 資料庫 State
   const [rooms, setRooms] = useState<Room[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
-  // 編輯 Modal 相關 State
+  // 3. 特殊房價設定 State
+  const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
+  const [customDate, setCustomDate] = useState('')
+  const [customPriceInput, setCustomPriceInput] = useState('')
+  const [settingPrice, setSettingPrice] = useState(false)
+
+  // 4. 編輯 Modal State
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // 透過後端 API 驗證帳密（安全）
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAuthenticating(true)
+    setLoginError('')
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setIsAuthenticated(true)
+        fetchData()
+      } else {
+        setLoginError(data.message || '帳號或密碼錯誤！')
+      }
+    } catch (err) {
+      setLoginError('連線失敗，請稍後再試。')
+    } finally {
+      setAuthenticating(false)
+    }
+  }
 
   // 撈取房型與訂單資料
   async function fetchData() {
@@ -74,7 +114,12 @@ export default function AdminPage() {
       .select('id, name, base_price, total_stock, close_weekend')
       .order('id')
 
-    if (roomsData) setRooms(roomsData)
+    if (roomsData) {
+      setRooms(roomsData)
+      if (roomsData.length > 0 && selectedRoomId === 0) {
+        setSelectedRoomId(roomsData[0].id)
+      }
+    }
 
     const { data: bookingsData } = await supabase
       .from('bookings')
@@ -85,54 +130,50 @@ export default function AdminPage() {
 
     setLoading(false)
   }
-=======
-type Room = { 
-  id: number; 
-  name: string; 
-  base_price: number; 
-  total_stock: number;
-  close_weekend: boolean; // 新增這行
-}
-type Booking = { id: number; room_id: number; guest_name: string; guest_phone: string; check_in: string; check_out: string; total_price: number }
 
-export default function AdminPage() {
-  const [rooms, setRooms] = useState<Room[]>([])
-  const [bookings, setBookings] = useState<Booking[]>([])
-  
-  // 房價房況設定 Form
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(1)
-  const [targetDate, setTargetDate] = useState('')
-  const [customPrice, setCustomPrice] = useState('')
-  const [msg, setMsg] = useState('')
+  // 設定每日特殊房價
+  const handleSetCustomPrice = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRoomId || !customDate) {
+      alert('請選擇房型與日期！')
+      return
+    }
 
-  const supabase = createClient()
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
+    setSettingPrice(true)
+    const priceVal = Number(customPriceInput)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+    if (priceVal <= 0 || isNaN(priceVal)) {
+      const { error } = await supabase
+        .from('room_prices')
+        .delete()
+        .eq('room_id', selectedRoomId)
+        .eq('date', customDate)
 
-<<<<<<< HEAD
-  // 切換週末開關
-=======
-  async function fetchData() {
-    // 撈房型
-    const { data: roomsData } = await supabase.from('rooms').select('*')
-    if (roomsData) setRooms(roomsData)
+      if (error) alert('清除失敗: ' + error.message)
+      else alert(`✅ 已恢復 ${customDate} 的預設房價！`)
+    } else {
+      const { error } = await supabase
+        .from('room_prices')
+        .upsert(
+          { room_id: selectedRoomId, date: customDate, price: priceVal },
+          { onConflict: 'room_id,date' }
+        )
 
-    // 撈訂單
-    const { data: bookingsData } = await supabase.from('bookings').select('*').order('id', { ascending: false })
-    if (bookingsData) setBookings(bookingsData)
+      if (error) alert('設定失敗: ' + error.message)
+      else alert(`✅ 成功將 ${customDate} 的房價調整為 NT$ ${priceVal.toLocaleString()}！`)
+    }
+
+    setSettingPrice(false)
+    setCustomPriceInput('')
   }
-// 切換週末開放/關閉狀態
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
+
+  // 切換週末開關
   async function toggleCloseWeekend(roomId: number, currentStatus: boolean) {
     const { error } = await supabase
       .from('rooms')
       .update({ close_weekend: !currentStatus })
       .eq('id', roomId)
 
-<<<<<<< HEAD
     if (error) alert('切換失敗: ' + error.message)
     else fetchData()
   }
@@ -152,11 +193,10 @@ export default function AdminPage() {
 
   // 開啟編輯視窗
   const handleOpenEditModal = (booking: Booking) => {
-    // 深拷貝，避免直接更動原始 State
     setEditingBooking(JSON.parse(JSON.stringify(booking)))
   }
 
-  // 更新編輯中的加購項目數量
+  // 更新編輯中的加購數量
   const handleUpdateAddonCount = (addonId: string, delta: number) => {
     if (!editingBooking) return
 
@@ -166,13 +206,12 @@ export default function AdminPage() {
     if (index > -1) {
       const newCount = currentAddons[index].count + delta
       if (newCount <= 0) {
-        currentAddons.splice(index, 1) // 數量降為 0 時移除
+        currentAddons.splice(index, 1)
       } else {
         currentAddons[index].count = newCount
         currentAddons[index].subtotal = newCount * currentAddons[index].price
       }
     } else if (delta > 0 && ADDON_PRICES[addonId]) {
-      // 原本沒有加購，點擊 + 時新增
       const info = ADDON_PRICES[addonId]
       currentAddons.push({
         id: addonId,
@@ -183,7 +222,6 @@ export default function AdminPage() {
       })
     }
 
-    // 重算加購總額與預估應付總額
     const newAddonsTotal = currentAddons.reduce((sum, a) => sum + a.subtotal, 0)
     const newGrandTotal = editingBooking.room_total_price + newAddonsTotal
 
@@ -195,7 +233,7 @@ export default function AdminPage() {
     })
   }
 
-  // 儲存編輯結果至 Supabase
+  // 儲存編輯結果
   const handleSaveBooking = async () => {
     if (!editingBooking) return
     setSaving(true)
@@ -227,157 +265,165 @@ export default function AdminPage() {
     }
   }
 
+  // 未登入時顯示登入畫面
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <form
+          onSubmit={handleLogin}
+          className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-8 rounded-2xl shadow-xl max-w-md w-full space-y-6 text-stone-900 dark:text-stone-100 transition-colors"
+        >
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-bold text-amber-600 dark:text-amber-500">🔒 後台管理員登入</h1>
+            <p className="text-xs text-stone-500 dark:text-stone-400">請輸入管理帳號與密碼以繼續</p>
+          </div>
+
+          {loginError && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3 rounded-lg text-center font-bold">
+              {loginError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-stone-600 dark:text-stone-400 block mb-1">管理員帳號</label>
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="請輸入帳號"
+                className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-3 text-sm focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-stone-600 dark:text-stone-400 block mb-1">管理員密碼</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="請輸入密碼"
+                className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-3 text-sm focus:outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={authenticating}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl transition shadow-md disabled:opacity-50"
+          >
+            {authenticating ? '驗證中...' : '驗證並登入'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
   if (loading) {
     return <div className="p-12 text-center text-amber-500">載入管理後台數據中...</div>
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-10 text-stone-100">
-      {/* 頁面標題 */}
-      <div className="border-b border-stone-800 pb-4 flex justify-between items-center">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-10 text-stone-900 dark:text-stone-100 transition-colors duration-300">
+      {/* 頁面標題列 */}
+      <div className="border-b border-stone-200 dark:border-stone-800 pb-4 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-amber-500">旅宿管理後台</h1>
-          <p className="text-stone-400 text-sm mt-1">即時控管房價、六日開關與顧客預訂紀錄。</p>
+          <h1 className="text-3xl font-bold text-amber-600 dark:text-amber-500">旅宿管理後台</h1>
+          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">即時控管每日房價、六日開關與顧客預訂紀錄。</p>
         </div>
-        <button
-          onClick={fetchData}
-          className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-4 py-2 rounded-lg text-xs font-bold transition border border-stone-700"
-        >
-          🔄 重新整理資料
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={fetchData}
+            className="bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 px-4 py-2 rounded-lg text-xs font-bold transition border border-stone-200 dark:border-stone-700"
+          >
+            🔄 重新整理
+          </button>
+          <button
+            onClick={() => setIsAuthenticated(false)}
+            className="bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 px-4 py-2 rounded-lg text-xs font-bold transition border border-red-500/20"
+          >
+            🚪 登出
+          </button>
+        </div>
       </div>
 
-      {/* 1. 房型六日滿房一鍵開關區塊 */}
-      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-amber-400 flex items-center gap-2">
-          ⚙️ 週末 (六日) 滿房一鍵開關
+      {/* 1. 每日單獨房價設定區塊 */}
+      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
+        <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+          📅 日期特殊房價設定 (連假 / 旺季調價)
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {rooms.map((r) => (
-            <div key={r.id} className="flex items-center justify-between p-4 border border-stone-800 rounded-xl bg-stone-950">
-=======
-    if (error) {
-      alert('切換失敗: ' + error.message)
-    } else {
-      fetchData() // 重新抓取最新狀態
-    }
-  }
-  // 設定特定日期的特殊房價 (寫入 room_prices)
-  async function handleSetPrice() {
-  setMsg('')
-  if (!targetDate || !customPrice) {
-    setMsg('請填寫完整日期與金額')
-    return
-  }
-
-  // 修改這裡：明確指定以 room_id,date 作為衝突比對目標
-  const { error } = await supabase.from('room_prices').upsert(
-    {
-      room_id: selectedRoomId,
-      date: targetDate,
-      price: Number(customPrice),
-    },
-    { 
-      onConflict: 'room_id,date'  // 關鍵：告訴 Supabase 遇到同房型同日期就改用 UPDATE
-    }
-  )
-
-  if (error) {
-    setMsg('設定失敗：' + error.message)
-  } else {
-    setMsg(`✅ 成功將 ${targetDate} 的房價設為 NT$ ${customPrice}`)
-    setTargetDate('')
-    setCustomPrice('')
-  }
-}
-
-  return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8 text-stone-100">
-      <h1 className="text-3xl font-bold text-amber-500 border-b border-stone-800 pb-4">
-        🛠️ 旅宿後台管理系統
-      </h1>
-
-      {/* 快速設定房價與房況區塊 */}
-      <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-amber-400">快速設定特殊日期房價</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={handleSetCustomPrice} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-sm text-stone-400 mb-1">選擇房型</label>
+            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">選擇房型</label>
             <select
               value={selectedRoomId}
               onChange={(e) => setSelectedRoomId(Number(e.target.value))}
-              className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm text-white focus:ring-2 focus:ring-amber-500"
+              className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
             >
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} (預設 ${r.base_price})
+                  {r.name} (預設 NT$ {r.base_price})
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm text-stone-400 mb-1">指定日期</label>
+            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">選擇日期</label>
             <input
               type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm text-white focus:ring-2 focus:ring-amber-500 [color-scheme:dark]"
+              required
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-stone-400 mb-1">當日特殊價格 (NT$)</label>
+            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">設定當日房價 (留空或 0 恢復預設)</label>
             <input
               type="number"
-              value={customPrice}
-              onChange={(e) => setCustomPrice(e.target.value)}
-              placeholder="例如: 3800"
-              className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm text-white focus:ring-2 focus:ring-amber-500"
+              placeholder="例：3200"
+              value={customPriceInput}
+              onChange={(e) => setCustomPriceInput(e.target.value)}
+              className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm font-mono"
             />
           </div>
-        </div>
 
-        <button
-          onClick={handleSetPrice}
-          className="bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold px-6 py-2.5 rounded-lg transition"
-        >
-          儲存特殊房價
-        </button>
-
-        {msg && <p className="text-sm font-medium text-emerald-400 mt-2">{msg}</p>}
+          <button
+            type="submit"
+            disabled={settingPrice}
+            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-2.5 px-4 rounded-lg text-sm transition shadow-md disabled:opacity-50"
+          >
+            {settingPrice ? '儲存中...' : '儲存特殊房價'}
+          </button>
+        </form>
       </div>
-{/* 房型六日滿房開關設定 */}
-      <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-amber-400">週末 (六日) 滿房一鍵開關</h2>
+
+      {/* 2. 房型六日滿房一鍵開關區塊 */}
+      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
+        <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+          ⚙️ 週末 (六日) 滿房一鍵開關
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {rooms.map((r) => (
-            <div key={r.id} className="flex items-center justify-between p-4 border border-stone-800 rounded-lg bg-stone-950">
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
+            <div key={r.id} className="flex items-center justify-between p-4 border border-stone-200 dark:border-stone-800 rounded-xl bg-stone-50 dark:bg-stone-950 transition-colors">
               <div>
-                <p className="font-bold text-stone-200">{r.name}</p>
+                <p className="font-bold text-stone-800 dark:text-stone-200">{r.name}</p>
                 <p className="text-xs mt-1">
                   狀態：{r.close_weekend 
-<<<<<<< HEAD
-                    ? <span className="text-red-400 font-bold">🔴 六日強制滿房</span> 
-                    : <span className="text-emerald-400 font-bold">🟢 六日正常開放</span>}
-=======
-                    ? <span className="text-red-400">🔴 六日已強制滿房</span> 
-                    : <span className="text-emerald-400">🟢 六日正常開放</span>}
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
+                    ? <span className="text-red-500 font-bold">🔴 六日強制滿房</span> 
+                    : <span className="text-emerald-600 dark:text-emerald-400 font-bold">🟢 六日正常開放</span>}
                 </p>
               </div>
               <button
                 onClick={() => toggleCloseWeekend(r.id, r.close_weekend)}
-<<<<<<< HEAD
                 className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
-=======
-                className={`px-4 py-2 rounded-lg font-bold text-sm transition ${
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
                   r.close_weekend 
-                    ? 'bg-stone-700 text-stone-300 hover:bg-stone-600' 
-                    : 'bg-red-900/20 text-red-400 hover:bg-red-900/50 border border-red-800/50'
+                    ? 'bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 hover:opacity-80' 
+                    : 'bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 border border-red-500/30'
                 }`}
               >
                 {r.close_weekend ? '重新開放週末' : '一鍵關閉週末'}
@@ -386,11 +432,10 @@ export default function AdminPage() {
           ))}
         </div>
       </div>
-<<<<<<< HEAD
 
-      {/* 2. 所有顧客訂單紀錄區塊 */}
-      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-amber-400 flex items-center gap-2 border-b border-stone-800 pb-3">
+      {/* 3. 所有顧客訂單紀錄區塊 */}
+      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
+        <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800 pb-3">
           📋 所有訂單紀錄 ({bookings.length} 筆)
         </h2>
 
@@ -399,50 +444,50 @@ export default function AdminPage() {
         ) : (
           <div className="space-y-4">
             {bookings.map((b) => (
-              <div key={b.id} className="bg-stone-950 border border-stone-800 rounded-xl p-5 space-y-4 hover:border-amber-900/40 transition">
-                <div className="flex flex-wrap justify-between items-start gap-2 border-b border-stone-800/80 pb-3">
+              <div key={b.id} className="bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl p-5 space-y-4 hover:border-amber-500/40 transition">
+                <div className="flex flex-wrap justify-between items-start gap-2 border-b border-stone-200 dark:border-stone-800 pb-3">
                   <div>
-                    <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold mr-2">
+                    <span className="text-xs bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold mr-2">
                       #{b.id}
                     </span>
-                    <span className="text-base font-bold text-stone-200 mr-3">
+                    <span className="text-base font-bold text-stone-900 dark:text-stone-200 mr-3">
                       {b.rooms?.name || `房型 ID: ${b.room_id}`}
                     </span>
-                    <span className="text-xs text-stone-400">
+                    <span className="text-xs text-stone-500 dark:text-stone-400">
                       ({b.room_count} 間 / {b.check_in} ～ {b.check_out})
                     </span>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-stone-500 block">總金額</span>
-                    <span className="text-lg font-bold text-amber-400 font-mono">
+                    <span className="text-lg font-bold text-amber-600 dark:text-amber-400 font-mono">
                       NT$ {(b.grand_total_price || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div className="bg-stone-900 p-3 rounded-lg border border-stone-800/60 space-y-1">
+                  <div className="bg-white dark:bg-stone-900 p-3 rounded-lg border border-stone-200 dark:border-stone-800/60 space-y-1">
                     <p className="text-stone-500 font-medium">👤 聯絡資訊</p>
-                    <p className="text-stone-200 font-bold">{b.guest_name || '未填寫'} ({b.guest_phone || '未填寫'})</p>
-                    <p className="text-stone-400">入住人數：{b.adults || 0} 大 / {b.children || 0} 小</p>
+                    <p className="text-stone-800 dark:text-stone-200 font-bold">{b.guest_name || '未填寫'} ({b.guest_phone || '未填寫'})</p>
+                    <p className="text-stone-500 dark:text-stone-400">入住人數：{b.adults || 0} 大 / {b.children || 0} 小</p>
                   </div>
 
-                  <div className="bg-stone-900 p-3 rounded-lg border border-stone-800/60 space-y-1">
+                  <div className="bg-white dark:bg-stone-900 p-3 rounded-lg border border-stone-200 dark:border-stone-800/60 space-y-1">
                     <p className="text-stone-500 font-medium">💰 費用拆解</p>
-                    <p className="text-stone-300">房間費用：<span className="font-mono text-stone-200">NT$ {(b.room_total_price || 0).toLocaleString()}</span></p>
-                    <p className="text-stone-300">加購行程：<span className="font-mono text-amber-400">NT$ {(b.addons_total_price || 0).toLocaleString()}</span></p>
+                    <p className="text-stone-600 dark:text-stone-300">房間費用：<span className="font-mono text-stone-900 dark:text-stone-200">NT$ {(b.room_total_price || 0).toLocaleString()}</span></p>
+                    <p className="text-stone-600 dark:text-stone-300">加購行程：<span className="font-mono text-amber-600 dark:text-amber-400">NT$ {(b.addons_total_price || 0).toLocaleString()}</span></p>
                   </div>
 
-                  <div className="bg-stone-900 p-3 rounded-lg border border-stone-800/60 space-y-1">
+                  <div className="bg-white dark:bg-stone-900 p-3 rounded-lg border border-stone-200 dark:border-stone-800/60 space-y-1">
                     <p className="text-stone-500 font-medium">🏄 加購體驗明細</p>
                     {(!b.selected_addons || b.selected_addons.length === 0) ? (
-                      <p className="text-stone-600 italic">無加購項目</p>
+                      <p className="text-stone-400 dark:text-stone-600 italic">無加購項目</p>
                     ) : (
                       <ul className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
                         {b.selected_addons.map((addon, idx) => (
-                          <li key={idx} className="text-stone-300 flex justify-between">
+                          <li key={idx} className="text-stone-700 dark:text-stone-300 flex justify-between">
                             <span>{addon.name} × {addon.count}</span>
-                            <span className="font-mono text-amber-500/80">NT$ {addon.subtotal}</span>
+                            <span className="font-mono text-amber-600 dark:text-amber-500/80">NT$ {addon.subtotal}</span>
                           </li>
                         ))}
                       </ul>
@@ -450,19 +495,18 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* 底部操作按鈕區 (新增編輯按鈕) */}
-                <div className="flex justify-between items-center pt-2 text-[11px] text-stone-500 border-t border-stone-900">
+                <div className="flex justify-between items-center pt-2 text-[11px] text-stone-500 border-t border-stone-200 dark:border-stone-900">
                   <span>下單時間：{new Date(b.created_at).toLocaleString()}</span>
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleOpenEditModal(b)}
-                      className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg font-bold transition"
+                      className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg font-bold transition"
                     >
                       ✏️ 編輯訂單
                     </button>
                     <button
                       onClick={() => handleDeleteBooking(b.id)}
-                      className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/50 px-3 py-1.5 rounded-lg font-bold transition"
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg font-bold transition"
                     >
                       取消並刪除
                     </button>
@@ -474,84 +518,82 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* ================= 彈出式訂單編輯視窗 (Modal) ================= */}
+      {/* 彈出式訂單編輯視窗 (Modal) */}
       {editingBooking && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-amber-500/30 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl text-stone-100">
-            <div className="flex justify-between items-center border-b border-stone-800 pb-3">
-              <h3 className="text-xl font-bold text-amber-500">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-stone-900 border border-amber-500/30 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl text-stone-900 dark:text-stone-100 transition-colors">
+            <div className="flex justify-between items-center border-b border-stone-200 dark:border-stone-800 pb-3">
+              <h3 className="text-xl font-bold text-amber-600 dark:text-amber-500">
                 ✏️ 編輯訂單 #{editingBooking.id}
               </h3>
               <button
                 onClick={() => setEditingBooking(null)}
-                className="text-stone-400 hover:text-white font-bold text-lg"
+                className="text-stone-400 hover:text-stone-900 dark:hover:text-white font-bold text-lg"
               >
                 ✕
               </button>
             </div>
 
-            {/* 顧客資料修改 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-stone-300 border-l-2 border-amber-500 pl-2">
+              <h4 className="text-sm font-bold text-stone-800 dark:text-stone-300 border-l-2 border-amber-500 pl-2">
                 顧客與人數資訊
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1">姓名</label>
+                  <label className="text-xs text-stone-500 dark:text-stone-400 block mb-1">姓名</label>
                   <input
                     type="text"
                     value={editingBooking.guest_name}
                     onChange={(e) => setEditingBooking({ ...editingBooking, guest_name: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm"
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1">電話</label>
+                  <label className="text-xs text-stone-500 dark:text-stone-400 block mb-1">電話</label>
                   <input
                     type="text"
                     value={editingBooking.guest_phone}
                     onChange={(e) => setEditingBooking({ ...editingBooking, guest_phone: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm"
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1">預訂間數</label>
+                  <label className="text-xs text-stone-500 dark:text-stone-400 block mb-1">預訂間數</label>
                   <input
                     type="number"
                     min="1"
                     value={editingBooking.room_count}
                     onChange={(e) => setEditingBooking({ ...editingBooking, room_count: Number(e.target.value) })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm"
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
                   />
                 </div>
                 <div className="flex space-x-2">
                   <div className="w-1/2">
-                    <label className="text-xs text-stone-400 block mb-1">大人</label>
+                    <label className="text-xs text-stone-500 dark:text-stone-400 block mb-1">大人</label>
                     <input
                       type="number"
                       min="1"
                       value={editingBooking.adults}
                       onChange={(e) => setEditingBooking({ ...editingBooking, adults: Number(e.target.value) })}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm"
+                      className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
                     />
                   </div>
                   <div className="w-1/2">
-                    <label className="text-xs text-stone-400 block mb-1">小孩</label>
+                    <label className="text-xs text-stone-500 dark:text-stone-400 block mb-1">小孩</label>
                     <input
                       type="number"
                       min="0"
                       value={editingBooking.children}
                       onChange={(e) => setEditingBooking({ ...editingBooking, children: Number(e.target.value) })}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-sm"
+                      className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-2.5 text-sm"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 加購行程調整 */}
             <div className="space-y-3">
-              <h4 className="text-sm font-bold text-stone-300 border-l-2 border-amber-500 pl-2">
+              <h4 className="text-sm font-bold text-stone-800 dark:text-stone-300 border-l-2 border-amber-500 pl-2">
                 調整加購行程
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
@@ -560,16 +602,16 @@ export default function AdminPage() {
                   const count = existing ? existing.count : 0
 
                   return (
-                    <div key={id} className="flex justify-between items-center bg-stone-950 p-2.5 rounded-lg border border-stone-800/80 text-xs">
+                    <div key={id} className="flex justify-between items-center bg-stone-50 dark:bg-stone-950 p-2.5 rounded-lg border border-stone-200 dark:border-stone-800/80 text-xs">
                       <div>
-                        <p className="font-bold text-stone-200">{info.name}</p>
-                        <p className="text-[10px] text-amber-500">NT$ {info.price}</p>
+                        <p className="font-bold text-stone-800 dark:text-stone-200">{info.name}</p>
+                        <p className="text-[10px] text-amber-600 dark:text-amber-500">NT$ {info.price}</p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
                           type="button"
                           onClick={() => handleUpdateAddonCount(id, -1)}
-                          className="w-6 h-6 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded font-bold"
+                          className="w-6 h-6 bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 text-amber-600 dark:text-amber-400 rounded font-bold"
                         >
                           -
                         </button>
@@ -577,7 +619,7 @@ export default function AdminPage() {
                         <button
                           type="button"
                           onClick={() => handleUpdateAddonCount(id, 1)}
-                          className="w-6 h-6 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded font-bold"
+                          className="w-6 h-6 bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 text-amber-600 dark:text-amber-400 rounded font-bold"
                         >
                           +
                         </button>
@@ -588,28 +630,26 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* 金額統計總計 */}
-            <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 space-y-2 text-xs">
-              <div className="flex justify-between text-stone-400">
+            <div className="bg-stone-50 dark:bg-stone-950 p-4 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 text-xs">
+              <div className="flex justify-between text-stone-500 dark:text-stone-400">
                 <span>房間費用 (不可更動)</span>
                 <span className="font-mono">NT$ {editingBooking.room_total_price?.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-stone-400">
+              <div className="flex justify-between text-stone-500 dark:text-stone-400">
                 <span>加購行程總額</span>
-                <span className="font-mono text-amber-400">NT$ {editingBooking.addons_total_price?.toLocaleString()}</span>
+                <span className="font-mono text-amber-600 dark:text-amber-400">NT$ {editingBooking.addons_total_price?.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-sm font-bold text-stone-100 pt-2 border-t border-stone-800">
+              <div className="flex justify-between text-sm font-bold text-stone-900 dark:text-stone-100 pt-2 border-t border-stone-200 dark:border-stone-800">
                 <span>重算後總金額</span>
-                <span className="text-amber-400 font-mono text-base">NT$ {editingBooking.grand_total_price?.toLocaleString()}</span>
+                <span className="text-amber-600 dark:text-amber-400 font-mono text-base">NT$ {editingBooking.grand_total_price?.toLocaleString()}</span>
               </div>
             </div>
 
-            {/* Modal 操作按鈕 */}
             <div className="flex justify-end space-x-3 pt-2">
               <button
                 type="button"
                 onClick={() => setEditingBooking(null)}
-                className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-bold transition"
+                className="px-4 py-2 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg text-xs font-bold transition"
               >
                 取消
               </button>
@@ -617,7 +657,7 @@ export default function AdminPage() {
                 type="button"
                 onClick={handleSaveBooking}
                 disabled={saving}
-                className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-stone-950 rounded-lg text-xs font-bold transition shadow-md disabled:opacity-50"
+                className="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-xs font-bold transition shadow-md disabled:opacity-50"
               >
                 {saving ? '儲存中...' : '確認變更並儲存'}
               </button>
@@ -625,38 +665,6 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-=======
-      {/* 查看最新訂單紀錄 */}
-      <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-amber-400">所有訂單紀錄 ({bookings.length})</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-stone-950 text-stone-400 border-b border-stone-800">
-              <tr>
-                <th className="p-3">編號</th>
-                <th className="p-3">訂房人</th>
-                <th className="p-3">電話</th>
-                <th className="p-3">入住日期</th>
-                <th className="p-3">退房日期</th>
-                <th className="p-3">總金額</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-800">
-              {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-stone-800/50">
-                  <td className="p-3">#{b.id}</td>
-                  <td className="p-3 font-medium text-stone-200">{b.guest_name}</td>
-                  <td className="p-3 text-stone-400">{b.guest_phone}</td>
-                  <td className="p-3 text-amber-400/90">{b.check_in}</td>
-                  <td className="p-3 text-amber-400/90">{b.check_out}</td>
-                  <td className="p-3 font-bold text-emerald-400">NT$ {b.total_price?.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
->>>>>>> 10cc32458c60ce5b260d25664686710a0928c632
     </div>
   )
 }
