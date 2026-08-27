@@ -118,3 +118,38 @@
   background-color: #292524 !important; 
   color: #57534e !important; 
 }
+
+/* 調整 react-datepicker 左右切換月份箭頭的位置 */
+.react-datepicker__navigation {
+  top: 18px !important; /* 數字加大（例如 18px ~ 22px），箭頭就會往移動 */
+}
+
+/* 確保箭頭垂直置中，樣式保持乾淨 */
+.react-datepicker__navigation-icon {
+  top: 0 !important;
+}
+/* 1. 調整日期數字（1, 2, 3...）的大小與間距 */
+.react-datepicker__day {
+  font-size: 0.95rem !important; /* 數字字體加大 (預設約 0.8rem) */
+  width: 2.8rem !important;      /* 稍微拉寬格字，避免文字擠壓 */
+  line-height: 1.5 !important;
+}
+
+/* 2. 調整頂部星期標題（日、一、二...）的大小 */
+.react-datepicker__day-name {
+  font-size: 0.85rem !important; /* 星期字體加大 */
+  width: 2.8rem !important;      /* 寬度保持與日期格子一致 */
+  font-weight: 700 !important;
+}
+
+/* 3. 調整頂部月份標題（例如：2026年 8月）的大小 */
+.react-datepicker__current-month {
+  font-size: 1.1rem !important;  /* 月份標題加大 */
+  font-weight: 800 !important;
+  margin-bottom: 8px !important;
+}
+
+/* 4. 調整自訂房價與剩餘間數等小字的大小 */
+.react-datepicker__day span {
+  font-size: 0.75rem !important; /* 日期下方的小字（如 $2.4k、餘 4 間） */
+}

@@ -35,7 +35,6 @@ export default function HomePage() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle /> {/* 按鈕放在這裡！ */}
-
         </div>
       </nav>
 
@@ -62,15 +61,14 @@ export default function HomePage() {
         <div className="grid gap-6 md:grid-cols-3">
           {rooms.map((room) => (
             <article key={room.name} className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm dark:shadow-none transition">
-              <div className="relative h-56 overflow-hidden">
+              <Link href={`/rooms/${room.slug}`} className="block relative h-64 overflow-hidden cursor-pointer">
                 <Image
                   src={room.image}
                   alt={room.name}
                   fill
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  className="object-cover"
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-              </div>
+              </Link>
               <div className="p-5">
                 <p className="text-sm text-stone-500 dark:text-stone-400">{room.people}</p>
                 <h3 className="mt-1 text-xl font-bold text-stone-900 dark:text-stone-100">{room.name}</h3>

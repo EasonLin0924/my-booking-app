@@ -76,19 +76,25 @@ export default function AvailabilityCalendar({ roomId }: CalendarProps) {
 
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('check_in, check_out')
+      .select('check_in, check_out, room_count')
       .eq('room_id', roomId)
 
     const countMap: StockMap = {}
     bookings?.forEach((b) => {
-      let curr = new Date(b.check_in)
-      const end = new Date(b.check_out)
+      const startStr = b.check_in.split('T')[0]
+      const endStr = b.check_out.split('T')[0]
+      
+      let curr = new Date(`${startStr}T00:00:00`)
+      const end = new Date(`${endStr}T00:00:00`)
+      const countToDeduct = b.room_count || 1
+
       while (curr < end) {
-        const dateStr = curr.toISOString().split('T')[0]
-        countMap[dateStr] = (countMap[dateStr] || 0) + 1
+        const dateStr = formatDateStr(curr)
+        countMap[dateStr] = (countMap[dateStr] || 0) + countToDeduct
         curr.setDate(curr.getDate() + 1)
       }
     })
+
     setBookedCounts(countMap)
     setFetching(false)
   }
@@ -111,6 +117,7 @@ export default function AvailabilityCalendar({ roomId }: CalendarProps) {
     return Math.max(0, totalStock - booked)
   }
 
+  // 判斷當天是否滿房（無房可供「入住」）
   const isDateDisabled = (date: Date) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -122,12 +129,51 @@ export default function AvailabilityCalendar({ roomId }: CalendarProps) {
     return getRemainingStock(date) <= 0
   }
 
+  // 💡 關鍵：選取區間變化時的防護與退房日允許邏輯
   const handleDateChange = (dates: [Date | null, Date | null]) => {
     const [start, end] = dates
-    setStartDate(start)
-    setEndDate(end)
+
+    // 1. 單選入住日：入住日絕對不能是滿房日
+    if (start && !end) {
+      if (isDateDisabled(start)) {
+        alert('⚠️ 該日期已滿房或不開放入住，請選擇其他日期！')
+        setStartDate(null)
+        setEndDate(null)
+        return
+      }
+      setStartDate(start)
+      setEndDate(null)
+      return
+    }
+
+    // 2. 選擇退房日：檢查 [start, end) 區間內是否有滿房日
+    if (start && end) {
+      let curr = new Date(start)
+      let hasBlockedDateInBetween = false
+
+      // 檢查入住日～退房日【前一天】是否有滿房日
+      // 注意：curr < end 確保不包含 end（退房日）本身！
+      while (curr < end) {
+        if (isDateDisabled(curr)) {
+          hasBlockedDateInBetween = true
+          break
+        }
+        curr.setDate(curr.getDate() + 1)
+      }
+
+      if (hasBlockedDateInBetween) {
+        alert('⚠️ 您選擇的預訂區間包含了滿房日，無法跨越預訂！')
+        setStartDate(start)
+        setEndDate(null)
+        return
+      }
+
+      setStartDate(start)
+      setEndDate(end)
+    }
   }
 
+  // 計算選取區間明細
   const calculatePriceBreakdown = () => {
     if (!startDate || !endDate) return { breakdown: [], totalPrice: 0, nights: 0 }
 
@@ -182,19 +228,19 @@ export default function AvailabilityCalendar({ roomId }: CalendarProps) {
               </span>
             )}
             
-            <span className="text-[9px] text-stone-400 dark:text-stone-500">
-              {isCheckOutDate ? '—' : `餘 ${remaining} 間`}
-            </span>
+              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                {isCheckOutDate ? '—' : `餘 ${remaining} 間`}
+              </span>
           </>
         )}
         
-        {disabled && <span className="text-[9px] text-stone-400 dark:text-stone-600">滿房</span>}
+        {disabled && (
+          <span className="text-[9px] text-stone-400 dark:text-stone-600">
+            {isCheckOutDate ? '退房' : '滿房'}
+          </span>
+        )}
       </div>
     )
-  }
-
-  if (loading) {
-    return <div className="p-8 text-center text-amber-500">載入房況中...</div>
   }
 
   return (
@@ -220,7 +266,13 @@ export default function AvailabilityCalendar({ roomId }: CalendarProps) {
           endDate={endDate}
           selectsRange
           inline
-          filterDate={(date) => !isDateDisabled(date)}
+          // 💡 關鍵修復：如果是選退房日，允許點擊「滿房日」作為退房日
+          filterDate={(date) => {
+            if (startDate && !endDate && date > startDate) {
+              return true // 允許後續日期被點選為退房日
+            }
+            return !isDateDisabled(date)
+          }}
           renderDayContents={renderDayContents}
           minDate={new Date()}
         />

@@ -21,4 +21,12 @@ export default function RootLayout({
       </body>
     </html>
   )
+
+  return (
+    <html lang="zh-TW" suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  )
 }

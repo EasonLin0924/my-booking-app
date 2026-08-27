@@ -67,7 +67,7 @@ export default function AdminPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(false)
 
-  // 3. 特殊房價設定 State
+  // 3. 特殊房價與單日鎖房 State
   const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
   const [customDate, setCustomDate] = useState('')
   const [customPriceInput, setCustomPriceInput] = useState('')
@@ -77,7 +77,7 @@ export default function AdminPage() {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // 透過後端 API 驗證帳密（安全）
+  // 登入 API
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthenticating(true)
@@ -167,6 +167,54 @@ export default function AdminPage() {
     setCustomPriceInput('')
   }
 
+  // 💡 關鍵新增：手動強行鎖死某一日（產生一筆手動占位訂單）
+  const handleLockSingleDate = async () => {
+    if (!selectedRoomId || !customDate) {
+      alert('請先選擇要鎖房的「房型」與「日期」！')
+      return
+    }
+
+    if (!confirm(`確定要把 ${customDate} 設定為【強制滿房/鎖房】嗎？`)) return
+
+    setSettingPrice(true)
+
+    // 計算退房日（鎖房日期的下一天）
+    const nextDay = new Date(customDate)
+    nextDay.setDate(nextDay.getDate() + 1)
+    const checkOutStr = nextDay.toISOString().split('T')[0]
+
+    // 撈出房型庫存量
+    const targetRoom = rooms.find((r) => r.id === selectedRoomId)
+    const stock = targetRoom ? targetRoom.total_stock : 1
+
+    // 直接寫入一筆【後台管理員手動鎖房】訂單，把該日期的庫存直接占滿！
+    const { error } = await supabase.from('bookings').insert([
+      {
+        room_id: selectedRoomId,
+        check_in: customDate,
+        check_out: checkOutStr,
+        room_count: stock, // 直接包下該房型當天所有間數
+        guest_name: '🔒 後台手動鎖房 / 保留房',
+        guest_phone: '0000000000',
+        adults: 1,
+        children: 0,
+        room_total_price: 0,
+        addons_total_price: 0,
+        grand_total_price: 0,
+        selected_addons: [],
+      },
+    ])
+
+    setSettingPrice(false)
+
+    if (error) {
+      alert('鎖房失敗: ' + error.message)
+    } else {
+      alert(`🔒 已成功將 ${customDate} 設定為滿房！前台日曆將不再開放預訂。`)
+      fetchData()
+    }
+  }
+
   // 切換週末開關
   async function toggleCloseWeekend(roomId: number, currentStatus: boolean) {
     const { error } = await supabase
@@ -178,15 +226,15 @@ export default function AdminPage() {
     else fetchData()
   }
 
-  // 刪除訂單
+  // 刪除訂單（手動鎖房的紀錄也可以透過刪除來解除鎖定）
   async function handleDeleteBooking(bookingId: number) {
-    if (!confirm(`確定要取消並刪除編號 #${bookingId} 的訂單嗎？`)) return
+    if (!confirm(`確定要取消／刪除編號 #${bookingId} 的紀錄嗎？`)) return
 
     const { error } = await supabase.from('bookings').delete().eq('id', bookingId)
 
     if (error) alert('刪除失敗: ' + error.message)
     else {
-      alert('訂單已刪除！')
+      alert('紀錄已刪除！')
       fetchData()
     }
   }
@@ -331,7 +379,7 @@ export default function AdminPage() {
       <div className="border-b border-stone-200 dark:border-stone-800 pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-amber-600 dark:text-amber-500">旅宿管理後台</h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">即時控管每日房價、六日開關與顧客預訂紀錄。</p>
+          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">即時控管每日房價、任意日期鎖房與顧客預訂紀錄。</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -349,13 +397,13 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* 1. 每日單獨房價設定區塊 */}
+      {/* 1. 任意日期改價與手動鎖房區塊 (重點升級) */}
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
         <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
-          📅 日期特殊房價設定 (連假 / 旺季調價)
+          📅 任意日期特殊設定 (改價 / 手動鎖房)
         </h2>
-        <form onSubmit={handleSetCustomPrice} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-          <div>
+        <form onSubmit={handleSetCustomPrice} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+          <div className="sm:col-span-3">
             <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">選擇房型</label>
             <select
               value={selectedRoomId}
@@ -370,8 +418,8 @@ export default function AdminPage() {
             </select>
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">選擇日期</label>
+          <div className="sm:col-span-3">
+            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">選擇指定日期</label>
             <input
               type="date"
               required
@@ -381,8 +429,8 @@ export default function AdminPage() {
             />
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">設定當日房價 (留空或 0 恢復預設)</label>
+          <div className="sm:col-span-3">
+            <label className="text-xs font-medium text-stone-500 dark:text-stone-400 block mb-1">設定房價 (0 恢復預設價)</label>
             <input
               type="number"
               placeholder="例：3200"
@@ -392,20 +440,30 @@ export default function AdminPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={settingPrice}
-            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-2.5 px-4 rounded-lg text-sm transition shadow-md disabled:opacity-50"
-          >
-            {settingPrice ? '儲存中...' : '儲存特殊房價'}
-          </button>
+          <div className="sm:col-span-3 flex gap-2">
+            <button
+              type="submit"
+              disabled={settingPrice}
+              className="flex-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-2.5 px-3 rounded-lg text-xs transition shadow-md disabled:opacity-50"
+            >
+              修改房價
+            </button>
+            <button
+              type="button"
+              onClick={handleLockSingleDate}
+              disabled={settingPrice}
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 px-3 rounded-lg text-xs transition shadow-md disabled:opacity-50"
+            >
+              🔒 設為滿房
+            </button>
+          </div>
         </form>
       </div>
 
       {/* 2. 房型六日滿房一鍵開關區塊 */}
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
         <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
-          ⚙️ 週末 (六日) 滿房一鍵開關
+          ⚙️ 週末 (六日) 全區域滿房一鍵開關
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {rooms.map((r) => (
@@ -414,7 +472,7 @@ export default function AdminPage() {
                 <p className="font-bold text-stone-800 dark:text-stone-200">{r.name}</p>
                 <p className="text-xs mt-1">
                   狀態：{r.close_weekend 
-                    ? <span className="text-red-500 font-bold">🔴 六日強制滿房</span> 
+                    ? <span className="text-red-500 font-bold">🔴 每週六日強制滿房</span> 
                     : <span className="text-emerald-600 dark:text-emerald-400 font-bold">🟢 六日正常開放</span>}
                 </p>
               </div>
@@ -433,10 +491,10 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* 3. 所有顧客訂單紀錄區塊 */}
+      {/* 3. 所有顧客訂單與鎖房紀錄區塊 */}
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
         <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2 border-b border-stone-200 dark:border-stone-800 pb-3">
-          📋 所有訂單紀錄 ({bookings.length} 筆)
+          📋 所有訂單與手動鎖房紀錄 ({bookings.length} 筆)
         </h2>
 
         {bookings.length === 0 ? (
@@ -502,13 +560,13 @@ export default function AdminPage() {
                       onClick={() => handleOpenEditModal(b)}
                       className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg font-bold transition"
                     >
-                      ✏️ 編輯訂單
+                      ✏️ 編輯
                     </button>
                     <button
                       onClick={() => handleDeleteBooking(b.id)}
                       className="bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg font-bold transition"
                     >
-                      取消並刪除
+                      {b.guest_name.includes('鎖房') ? '🔓 解除鎖房' : '取消並刪除'}
                     </button>
                   </div>
                 </div>
