@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { useRouter } from 'next/navigation'
 
 type Room = {
   id: number
@@ -54,55 +55,39 @@ const ADDON_PRICES: Record<string, { name: string; price: number }> = {
 
 export default function AdminPage() {
   const supabase = createClient()
+  const router = useRouter()
 
-  // 1. 登入驗證 State
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [authenticating, setAuthenticating] = useState(false)
-
-  // 2. 資料庫 State
+  // 1. 資料庫 State
   const [rooms, setRooms] = useState<Room[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // 3. 特殊房價與單日鎖房 State
+  // 2. 特殊房價與單日鎖房 State
   const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
   const [customDate, setCustomDate] = useState('')
   const [customPriceInput, setCustomPriceInput] = useState('')
   const [settingPrice, setSettingPrice] = useState(false)
 
-  // 4. 編輯 Modal State
+  // 3. 編輯 Modal State
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // 登入 API
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setAuthenticating(true)
-    setLoginError('')
+  // 自動檢查 Cookie 並讀取資料
+  useEffect(() => {
+    const hasToken = document.cookie.split('; ').some((item) => item.startsWith('admin_token='))
 
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
-
-      const data = await res.json()
-
-      if (res.ok && data.success) {
-        setIsAuthenticated(true)
-        fetchData()
-      } else {
-        setLoginError(data.message || '帳號或密碼錯誤！')
-      }
-    } catch (err) {
-      setLoginError('連線失敗，請稍後再試。')
-    } finally {
-      setAuthenticating(false)
+    if (!hasToken) {
+      window.location.href = '/admin/login'
+    } else {
+      fetchData()
     }
+  }, [])
+
+  // 登出處理函式 (已修正：刪除多餘的 router.push)
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' })
+    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    window.location.href = '/admin/login'
   }
 
   // 撈取房型與訂單資料
@@ -167,7 +152,7 @@ export default function AdminPage() {
     setCustomPriceInput('')
   }
 
-  // 💡 關鍵新增：手動強行鎖死某一日（產生一筆手動占位訂單）
+  // 手動鎖房
   const handleLockSingleDate = async () => {
     if (!selectedRoomId || !customDate) {
       alert('請先選擇要鎖房的「房型」與「日期」！')
@@ -178,22 +163,19 @@ export default function AdminPage() {
 
     setSettingPrice(true)
 
-    // 計算退房日（鎖房日期的下一天）
     const nextDay = new Date(customDate)
     nextDay.setDate(nextDay.getDate() + 1)
     const checkOutStr = nextDay.toISOString().split('T')[0]
 
-    // 撈出房型庫存量
     const targetRoom = rooms.find((r) => r.id === selectedRoomId)
     const stock = targetRoom ? targetRoom.total_stock : 1
 
-    // 直接寫入一筆【後台管理員手動鎖房】訂單，把該日期的庫存直接占滿！
     const { error } = await supabase.from('bookings').insert([
       {
         room_id: selectedRoomId,
         check_in: customDate,
         check_out: checkOutStr,
-        room_count: stock, // 直接包下該房型當天所有間數
+        room_count: stock,
         guest_name: '🔒 後台手動鎖房 / 保留房',
         guest_phone: '0000000000',
         adults: 1,
@@ -226,7 +208,7 @@ export default function AdminPage() {
     else fetchData()
   }
 
-  // 刪除訂單（手動鎖房的紀錄也可以透過刪除來解除鎖定）
+  // 刪除訂單
   async function handleDeleteBooking(bookingId: number) {
     if (!confirm(`確定要取消／刪除編號 #${bookingId} 的紀錄嗎？`)) return
 
@@ -313,64 +295,8 @@ export default function AdminPage() {
     }
   }
 
-  // 未登入時顯示登入畫面
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4">
-        <form
-          onSubmit={handleLogin}
-          className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-8 rounded-2xl shadow-xl max-w-md w-full space-y-6 text-stone-900 dark:text-stone-100 transition-colors"
-        >
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-amber-600 dark:text-amber-500">🔒 後台管理員登入</h1>
-            <p className="text-xs text-stone-500 dark:text-stone-400">請輸入管理帳號與密碼以繼續</p>
-          </div>
-
-          {loginError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3 rounded-lg text-center font-bold">
-              {loginError}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-stone-600 dark:text-stone-400 block mb-1">管理員帳號</label>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="請輸入帳號"
-                className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-3 text-sm focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-stone-600 dark:text-stone-400 block mb-1">管理員密碼</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="請輸入密碼"
-                className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-lg p-3 text-sm focus:outline-none focus:border-amber-500"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={authenticating}
-            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl transition shadow-md disabled:opacity-50"
-          >
-            {authenticating ? '驗證中...' : '驗證並登入'}
-          </button>
-        </form>
-      </div>
-    )
-  }
-
   if (loading) {
-    return <div className="p-12 text-center text-amber-500">載入管理後台數據中...</div>
+    return <div className="p-12 text-center text-amber-500 font-bold">載入管理後台數據中...</div>
   }
 
   return (
@@ -389,7 +315,7 @@ export default function AdminPage() {
             🔄 重新整理
           </button>
           <button
-            onClick={() => setIsAuthenticated(false)}
+            onClick={handleLogout}
             className="bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 px-4 py-2 rounded-lg text-xs font-bold transition border border-red-500/20"
           >
             🚪 登出
@@ -397,7 +323,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* 1. 任意日期改價與手動鎖房區塊 (重點升級) */}
+      {/* 1. 任意日期改價與手動鎖房區塊 */}
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 space-y-4 shadow-sm dark:shadow-none transition-colors">
         <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
           📅 任意日期特殊設定 (改價 / 手動鎖房)

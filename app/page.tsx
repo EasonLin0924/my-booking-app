@@ -20,9 +20,7 @@ export default function HomePage() {
     <main className="min-h-screen">
       {/* 你原本的 Navbar */}
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link href="/" className="text-xl font-bold tracking-wide text-stone-900 dark:text-stone-100">
-          A路小琉球民宿 ⧗ A·road B&B
-        </Link>
+
 
         <div className="hidden gap-6 text-sm text-stone-600 dark:text-stone-300 md:flex">
           <a href="#rooms" className="hover:text-amber-600 dark:hover:text-amber-400">房型介紹</a>
@@ -33,12 +31,10 @@ export default function HomePage() {
           <a href="#notice" className="hover:text-amber-600 dark:hover:text-amber-400">注意事項</a>
         </div>
 
-        <div className="flex items-center gap-4">
-          <ThemeToggle /> {/* 按鈕放在這裡！ */}
-        </div>
+
       </nav>
 
-      <section className="mx-auto max-w-6xl px-6 pb-20 pt-16 text-center md:pt-28">
+      <section className="mx-auto max-w-6xl px-6 pt-16 text-center md:pt-28">
         <p className="mb-4 text-sm tracking-[0.3em] font-semibold text-amber-600 dark:text-amber-400">
           A路小琉球民宿 ⧗ A·road B&B
         </p>

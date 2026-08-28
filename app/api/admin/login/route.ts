@@ -4,22 +4,19 @@ export async function POST(request: Request) {
   try {
     const { username, password } = await request.json()
 
-    const envUsername = process.env.ADMIN_USERNAME
-    const envPassword = process.env.ADMIN_PASSWORD
+    const expectedUsername = process.env.ADMIN_USERNAME
+    const expectedPassword = process.env.ADMIN_PASSWORD
 
-    // 在伺服器端比對環境變數
-    if (username === envUsername && password === envPassword) {
+    if (!expectedUsername || !expectedPassword) {
+      return NextResponse.json({ message: '伺服器未設定 ADMIN_USERNAME 或 ADMIN_PASSWORD' }, { status: 500 })
+    }
+
+    if (username === expectedUsername && password === expectedPassword) {
       return NextResponse.json({ success: true })
     }
 
-    return NextResponse.json(
-      { success: false, message: '帳號或密碼錯誤！' },
-      { status: 401 }
-    )
+    return NextResponse.json({ message: '帳號或密碼錯誤！' }, { status: 401 })
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: '伺服器內部錯誤' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: '伺服器驗證失敗' }, { status: 500 })
   }
 }

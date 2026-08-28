@@ -1,23 +1,51 @@
 'use client'
 
-import { ThemeProvider } from 'next-themes'
-import { useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
+
+type Theme = 'dark' | 'light'
+
+type ThemeContextType = {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false)
+  const [theme, setThemeState] = useState<Theme>('dark')
 
   useEffect(() => {
-    setMounted(true)
+    // 頁面載入時讀取 localStorage，預設為 dark
+    const savedTheme = (localStorage.getItem('theme') as Theme) || 'dark'
+    setThemeState(savedTheme)
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }, [])
 
-  // 尚未在 Client 端 Mount 前先不渲染 ThemeProvider，避開腳本注入警示
-  if (!mounted) {
-    return <>{children}</>
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme)
+    localStorage.setItem('theme', newTheme)
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
-    </ThemeProvider>
+    </ThemeContext.Provider>
   )
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext)
+  if (!context) {
+    throw new Error('useTheme must be used within a Providers')
+  }
+  return context
 }

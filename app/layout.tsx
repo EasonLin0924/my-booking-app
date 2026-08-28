@@ -1,31 +1,25 @@
 import './globals.css'
-import Providers from './providers'
+import Providers from '@/app/providers'
+import Navbar from '@/components/Navbar' // 👈 1. 引入 Navbar
 
 export const metadata = {
-  title: 'A路小琉球民宿 ⧗ A·road B&B',
-  description: '線上訂房管理系統',
+  title: 'A路小琉球民宿',
+  description: '小琉球優質旅宿與行程預訂',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-TW" suppressHydrationWarning>
-      {/* 讓 body 負責全站底色，完全滿版延伸 */}
-      <body className="bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-300">
+    <html lang="zh-TW" className="dark" suppressHydrationWarning>
+      <body className="bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 min-h-screen flex flex-col transition-colors duration-300">
         <Providers>
-          {children}
+          {/* 👈 2. 常駐導覽列（包含標題與深淺色按鈕） */}
+          <Navbar />
+          
+          {/* 主要頁面內容 */}
+          <main className="flex-1">
+            {children}
+          </main>
         </Providers>
-      </body>
-    </html>
-  )
-
-  return (
-    <html lang="zh-TW" suppressHydrationWarning>
-      <body>
-        <Providers>{children}</Providers>
       </body>
     </html>
   )
