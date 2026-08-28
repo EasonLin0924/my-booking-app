@@ -1,6 +1,15 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import ThemeToggle from '@/components/ThemeToggle' // 匯入切換按鈕
+import ThemeToggle from '@/components/ThemeToggle'
+
+// 靜態資料結構（若未來自 API 取得，需確保資料型別嚴格驗證）
+interface Room {
+  slug: string
+  name: string
+  price: number
+  people: string
+  image: string
+}
 
 const features = [
   { icon: '📶', title: '高速 Wi‑Fi', text: '全館免費無線網路' },
@@ -10,7 +19,7 @@ const features = [
   { icon: '🏠', title: '分區包棟', text: '彈性的分區包棟選項' },
 ]
 
-const rooms = [
+const rooms: Room[] = [
   { slug: 'view-double', name: '景觀雙人房', price: 2400, people: '2 人入住', image: '/images/rooms/view-double.jpg' },
   { slug: 'warm-quad', name: '溫馨四人房', price: 4800, people: '4 人入住', image: '/images/rooms/family-quad2.jpg' },
 ]
@@ -18,10 +27,7 @@ const rooms = [
 export default function HomePage() {
   return (
     <main className="min-h-screen">
-      {/* 你原本的 Navbar */}
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-
-
         <div className="hidden gap-6 text-sm text-stone-600 dark:text-stone-300 md:flex">
           <a href="#rooms" className="hover:text-amber-600 dark:hover:text-amber-400">房型介紹</a>
           <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400">設施服務</a>
@@ -30,8 +36,6 @@ export default function HomePage() {
           <a href="#activity" className="hover:text-amber-600 dark:hover:text-amber-400">套裝行程</a>
           <a href="#notice" className="hover:text-amber-600 dark:hover:text-amber-400">注意事項</a>
         </div>
-
-
       </nav>
 
       <section className="mx-auto max-w-6xl px-6 pt-16 text-center md:pt-28">
@@ -56,12 +60,13 @@ export default function HomePage() {
 
         <div className="grid gap-6 md:grid-cols-3">
           {rooms.map((room) => (
-            <article key={room.name} className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm dark:shadow-none transition">
-              <Link href={`/rooms/${room.slug}`} className="block relative h-64 overflow-hidden cursor-pointer">
+            <article key={room.slug} className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm dark:shadow-none transition">
+              <Link href={`/rooms/${encodeURIComponent(room.slug)}`} className="block relative h-64 overflow-hidden cursor-pointer">
                 <Image
                   src={room.image}
                   alt={room.name}
                   fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw"
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
                 />
               </Link>
@@ -72,7 +77,7 @@ export default function HomePage() {
                   NT$ {room.price.toLocaleString()} <span className="text-sm font-normal text-stone-500 dark:text-stone-400">/ 晚起</span>
                 </p>
                 <Link
-                  href={`/rooms/${room.slug}`}
+                  href={`/rooms/${encodeURIComponent(room.slug)}`}
                   className="mt-5 block text-sm font-medium text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
                 >
                   查看房型詳細介紹 →
@@ -112,6 +117,7 @@ export default function HomePage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 shadow-sm dark:shadow-none transition">
+          {/* 加入 sandbox 控制 iframe 存取權限，預防外洩或跨域威脅 */}
           <iframe
             title="A路小琉球民宿地圖"
             src="https://www.google.com/maps?q=屏東縣琉球鄉民權路7-5號&output=embed"
@@ -120,14 +126,16 @@ export default function HomePage() {
             className="border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
+            sandbox="allow-scripts allow-same-origin allow-popups"
           />
         </div>
 
         <div className="mt-5 text-center">
+          {/* 強制補齊 rel="noopener noreferrer" 避免 Tabnabbing 攻擊 */}
           <a
             href="https://www.google.com/maps/search/?api=1&query=屏東縣琉球鄉民權路7-5號"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="text-sm font-semibold text-amber-600 dark:text-amber-400 hover:underline"
           >
             在 Google 地圖中開啟導航 →
