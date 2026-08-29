@@ -151,6 +151,7 @@ function BookingForm() {
       subtotal: item.total,
     }))
 
+    // 1. 寫入 Supabase 資料庫
     const { data, error } = await supabase
       .from('bookings')
       .insert([
@@ -177,6 +178,31 @@ function BookingForm() {
       return
     }
 
+    // 2. 💡 加上 await 確保打完 Discord 通知 API
+    try {
+      await fetch('/api/notify-discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.id,
+          room_id: roomId,
+          room_name: roomName,
+          check_in: checkIn,
+          check_out: checkOut,
+          room_count: roomCount,
+          guest_name: guestName,
+          guest_phone: guestPhone,
+          adults: adults,
+          children: children,
+          grand_total_price: grandTotal,
+          selected_addons: addonsData,
+        }),
+      })
+    } catch (err) {
+      console.error('Discord 通知發送失敗:', err)
+    }
+
+    // 3. 通知發送完畢，最後跳轉至成功頁面
     router.push(`/booking/success?bookingId=${data.id}`)
   }
 
